@@ -40,6 +40,14 @@ jobs:
           tag: 6.2-RELEASE
       - name: Build Core
         run: swift build --package-path Core
+      - name: Build Windows engine DLL
+        run: swift build --package-path Core --product AzooKeyDesktopEngine
+      - name: Verify Windows engine DLL
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem Core\.build -Recurse -Filter AzooKeyDesktopEngine.dll | Select-Object -First 1
+          if (-not $dll) { throw "AzooKeyDesktopEngine.dll was not produced" }
+          Write-Host "Found $($dll.FullName)"
       - name: Test Core
         run: swift test --package-path Core
 
