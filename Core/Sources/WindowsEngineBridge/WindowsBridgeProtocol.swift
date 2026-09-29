@@ -112,6 +112,7 @@ struct WindowsBridgeEffect: Codable {
     var text: String?
     var secondaryText: String?
     var language: WindowsBridgeLanguage?
+
 }
 
 struct WindowsBridgeResponse: Codable {
