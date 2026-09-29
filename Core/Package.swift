@@ -18,6 +18,18 @@ var products: [Product] = [
     )
 ]
 
+var coreTargetDependencies: [Target.Dependency] = [
+    .product(name: "SwiftUtils", package: "AzooKeyKanaKanjiConverter"),
+    .product(name: "KanaKanjiConverterModuleWithDefaultDictionary", package: "AzooKeyKanaKanjiConverter"),
+    .product(name: "Crypto", package: "swift-crypto")
+]
+
+#if !os(Windows)
+coreTargetDependencies.append(
+    .product(name: "ZIPFoundation", package: "ZIPFoundation")
+)
+#endif
+
 var targets: [Target] = [
     .executableTarget(
         name: "git-info-generator"
@@ -29,12 +41,7 @@ var targets: [Target] = [
     ),
     .target(
         name: "Core",
-        dependencies: [
-            .product(name: "SwiftUtils", package: "AzooKeyKanaKanjiConverter"),
-            .product(name: "KanaKanjiConverterModuleWithDefaultDictionary", package: "AzooKeyKanaKanjiConverter"),
-            .product(name: "Crypto", package: "swift-crypto"),
-            .product(name: "ZIPFoundation", package: "ZIPFoundation")
-        ],
+        dependencies: coreTargetDependencies,
         swiftSettings: [.interoperabilityMode(.Cxx)],
         plugins: [
             .plugin(name: "GitInfoPlugin")
