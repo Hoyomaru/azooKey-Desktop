@@ -81,7 +81,13 @@ products.append(
 targets.append(
     .target(
         name: "WindowsEngineBridge",
-        dependencies: ["Core"],
+        dependencies: [
+            "Core",
+            .product(
+                name: "KanaKanjiConverterModuleWithDefaultDictionary",
+                package: "AzooKeyKanaKanjiConverter"
+            )
+        ],
         swiftSettings: [.interoperabilityMode(.Cxx)]
     )
 )
