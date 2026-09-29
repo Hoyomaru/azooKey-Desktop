@@ -47,6 +47,17 @@ var targets: [Target] = [
             .plugin(name: "GitInfoPlugin")
         ]
     ),
+    .target(
+        name: "ConverterEngine",
+        dependencies: [
+            "Core",
+            .product(
+                name: "KanaKanjiConverterModuleWithDefaultDictionary",
+                package: "AzooKeyKanaKanjiConverter"
+            )
+        ],
+        swiftSettings: [.interoperabilityMode(.Cxx)]
+    ),
     .testTarget(
         name: "CoreTests",
         dependencies: ["Core"],
@@ -64,7 +75,7 @@ products.append(
 targets.append(
     .executableTarget(
         name: "ConverterServer",
-        dependencies: ["Core"],
+        dependencies: ["Core", "ConverterEngine"],
         swiftSettings: [.interoperabilityMode(.Cxx)]
     )
 )
