@@ -1,6 +1,6 @@
+@testable import Core
 import Foundation
 import Testing
-@testable import Core
 
 @Test func converterEngineEnvironmentKeepsHostProvidedLocations() {
     let root = URL(fileURLWithPath: "/tmp/azookey-test", isDirectory: true)
