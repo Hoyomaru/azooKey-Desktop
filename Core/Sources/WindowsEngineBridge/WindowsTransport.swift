@@ -1,4 +1,5 @@
 import Core
+import Foundation
 
 let windowsTransportProtocolVersion: UInt32 = 1
 
@@ -309,15 +310,17 @@ struct WindowsTransportResponse: Codable {
         }
 
         init(_ markedText: ConverterMarkedText) {
-            self.elements = markedText.elements.map {
-                Element(
-                    content: $0.content,
-                    focus: switch $0.focus {
-                    case .focused: "focused"
-                    case .unfocused: "unfocused"
-                    case .none: "none"
-                    }
-                )
+            self.elements = markedText.elements.map { element in
+                let focus: String
+                switch element.focus {
+                case .focused:
+                    focus = "focused"
+                case .unfocused:
+                    focus = "unfocused"
+                case .none:
+                    focus = "none"
+                }
+                return Element(content: element.content, focus: focus)
             }
             self.selectionLocation = markedText.selectionRange.location
             self.selectionLength = markedText.selectionRange.length
