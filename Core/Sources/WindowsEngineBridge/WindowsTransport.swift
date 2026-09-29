@@ -94,6 +94,27 @@ struct WindowsTransportKeyEvent: Codable {
     var visibleCandidateStartIndex: Int
     var context: WindowsTransportTextContext
 
+    enum CodingKeys: String, CodingKey {
+        case eventID = "eventId"
+        case coreKeyCode
+        case characters
+        case charactersIgnoringModifiers
+        case modifierFlags
+        case inputStyle
+        case inputLanguage
+        case activate
+        case liveConversionEnabled
+        case enableDebugWindow
+        case enableSuggestion
+        case enablePredictiveTyping
+        case enableTypoCorrection
+        case enableOptionDirectFullWidthInput
+        case typeBackSlash
+        case optionDirectInputText
+        case visibleCandidateStartIndex
+        case context
+    }
+
     var core: ConverterKeyEventRequest {
         let activation: ConverterSessionActivation? = activate
             ? .init(
@@ -139,6 +160,15 @@ struct WindowsTransportRequest: Codable {
     var keyEvent: WindowsTransportKeyEvent?
     var candidateIndex: Int?
     var context: WindowsTransportTextContext?
+
+    enum CodingKeys: String, CodingKey {
+        case protocolVersion
+        case operation
+        case sessionID = "sessionId"
+        case keyEvent
+        case candidateIndex
+        case context
+    }
 
     enum Action {
         case command(ConverterServerCommand)
