@@ -131,6 +131,7 @@ struct WindowsBridgeResponse: Codable {
     var isEmpty: Bool
     var convertTarget: String
 
+    // swiftlint:disable:next cyclomatic_complexity
     init(_ response: ConverterServerResponse) {
         self.handled = response.handled
         self.inputLanguage = response.inputLanguage.map(WindowsBridgeLanguage.init)
@@ -251,6 +252,7 @@ struct WindowsBridgeResponse: Codable {
 }
 
 private extension WindowsBridgeEffect {
+    // swiftlint:disable:next cyclomatic_complexity
     init(_ effect: ConverterClientEffect) {
         switch effect {
         case .insertText(let text):
