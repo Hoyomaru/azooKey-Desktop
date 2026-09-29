@@ -12,7 +12,7 @@ private func makeSegmentsManager() -> SegmentsManager {
     )
 }
 
-@MainActor
+@ConverterEngineActor
 private func makeEditedRangeScenario() -> (manager: SegmentsManager, selectedRuby: String) {
     let manager = makeSegmentsManager()
     manager.insertAtCursorPosition("hennkann", inputStyle: .roman2kana)
@@ -24,7 +24,7 @@ private func makeEditedRangeScenario() -> (manager: SegmentsManager, selectedRub
     return (manager, selectedRuby)
 }
 
-@MainActor
+@ConverterEngineActor
 @Test func testAdditionalHiraganaCandidateUsesEditedSelectionRuby() async throws {
     let (manager, selectedRuby) = makeEditedRangeScenario()
     manager.requestSelectingPrevCandidate()
@@ -43,7 +43,7 @@ private func makeEditedRangeScenario() -> (manager: SegmentsManager, selectedRub
     }
 }
 
-@MainActor
+@ConverterEngineActor
 @Test func testAdditionalCandidatesExpandInSuffixOrder() async throws {
     let manager = makeSegmentsManager()
     manager.insertAtCursorPosition("abc", inputStyle: .direct)
@@ -79,7 +79,7 @@ private func makeEditedRangeScenario() -> (manager: SegmentsManager, selectedRub
     }
 }
 
-@MainActor
+@ConverterEngineActor
 @Test func testAdditionalCandidatesExpansionCapsAtDeclaredCount() async throws {
     let manager = makeSegmentsManager()
     manager.insertAtCursorPosition("abc", inputStyle: .direct)
@@ -100,7 +100,7 @@ private func makeEditedRangeScenario() -> (manager: SegmentsManager, selectedRub
     }
 }
 
-@MainActor
+@ConverterEngineActor
 @Test func testResettingSelectionClearsAdditionalCandidateContexts() async throws {
     let manager = makeSegmentsManager()
     manager.insertAtCursorPosition("abc", inputStyle: .direct)
