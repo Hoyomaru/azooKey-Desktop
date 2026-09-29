@@ -289,8 +289,9 @@ public func azookeyEngineHandleAsync(
         switch result {
         case .success(let data):
             target.respond(status: 0, data: data)
-        case .failure:
-            target.respond(status: -4)
+        case .failure(let error):
+            let detail = Data(error.localizedDescription.utf8)
+            target.respond(status: -4, data: detail)
         }
     }
 }
