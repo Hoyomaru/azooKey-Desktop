@@ -52,6 +52,12 @@ func shell(_ command: String) throws -> String {
     }
 
     let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    return String(decoding: data, as: UTF8.self)
-        .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let output = String(bytes: data, encoding: .utf8) else {
+        throw NSError(
+            domain: "GitInfoGenerator",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Command output was not valid UTF-8"]
+        )
+    }
+    return output.trimmingCharacters(in: .whitespacesAndNewlines)
 }
