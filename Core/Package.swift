@@ -51,10 +51,7 @@ var targets: [Target] = [
         name: "ConverterEngine",
         dependencies: [
             "Core",
-            .product(
-                name: "KanaKanjiConverterModuleWithDefaultDictionary",
-                package: "AzooKeyKanaKanjiConverter"
-            )
+            "ConverterEngine"
         ],
         swiftSettings: [.interoperabilityMode(.Cxx)]
     ),
