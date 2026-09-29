@@ -1,20 +1,76 @@
 import Core
 import Foundation
+import KanaKanjiConverterModuleWithDefaultDictionary
 
 private let bridgeABIVersion: UInt32 = 1
 
+private struct BridgeRequest: Decodable {
+    var type: String
+    var text: String?
+    var inputStyle: String?
+}
+
+private struct ConversionSmokeResponse: Encodable {
+    var type = "conversion-smoke"
+    var candidates: [String]
+}
+
 private final class BridgeEngine {
     private let configuration: Data
+    private let converter = KanaKanjiConverter.withDefaultDictionary()
+    private let memoryDirectoryURL: URL
 
     init(configuration: Data) {
         self.configuration = configuration
+        self.memoryDirectoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("azookey-desktop-engine", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: self.memoryDirectoryURL,
+            withIntermediateDirectories: true
+        )
     }
 
-    func handle(_ request: Data) -> Data {
-        // The first bridge milestone validates DLL loading, lifetime and byte transport.
-        // The next step replaces this echo with the shared desktop converter engine.
-        _ = configuration
-        return request
+    func handle(_ request: Data) throws -> Data {
+        guard let bridgeRequest = try? JSONDecoder().decode(BridgeRequest.self, from: request),
+              bridgeRequest.type == "conversion-smoke",
+              let text = bridgeRequest.text
+        else {
+            // Keep unknown requests byte-for-byte compatible while the complete
+            // ConverterServer command host is being moved into the shared engine.
+            _ = configuration
+            return request
+        }
+
+        var composingText = ComposingText()
+        composingText.insertAtCursorPosition(
+            text,
+            inputStyle: bridgeRequest.inputStyle == "roman2kana" ? .roman2kana : .direct
+        )
+
+        let result = converter.requestCandidates(
+            composingText,
+            options: .init(
+                N_best: 10,
+                requireJapanesePrediction: .disabled,
+                requireEnglishPrediction: .disabled,
+                keyboardLanguage: .ja_JP,
+                englishCandidateInRoman2KanaInput: true,
+                fullWidthRomanCandidate: false,
+                halfWidthKanaCandidate: false,
+                learningType: .nothing,
+                maxMemoryCount: 65536,
+                shouldResetMemory: false,
+                memoryDirectoryURL: memoryDirectoryURL,
+                sharedContainerURL: memoryDirectoryURL,
+                textReplacer: .withDefaultEmojiDictionary(),
+                specialCandidateProviders: KanaKanjiConverter.defaultSpecialCandidateProviders,
+                metadata: .init(versionString: "azooKey Windows bridge")
+            )
+        )
+
+        return try JSONEncoder().encode(
+            ConversionSmokeResponse(candidates: result.mainResults.prefix(10).map(\.text))
+        )
     }
 }
 
@@ -64,7 +120,12 @@ public func azookeyEngineHandle(
     }
 
     let engine = Unmanaged<BridgeEngine>.fromOpaque(context).takeUnretainedValue()
-    let response = engine.handle(request)
+    let response: Data
+    do {
+        response = try engine.handle(request)
+    } catch {
+        return -4
+    }
 
     guard response.count <= Int(UInt32.max) else {
         return -3
