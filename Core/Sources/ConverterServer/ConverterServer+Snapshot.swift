@@ -86,10 +86,13 @@ extension ConverterServer {
     }
 
     @MainActor
-    static func makeSegmentsManager(kanaKanjiConverter: KanaKanjiConverter) -> SegmentsManager {
+    static func makeSegmentsManager(
+        kanaKanjiConverter: KanaKanjiConverter,
+        environment: ConverterEngineEnvironment
+    ) -> SegmentsManager {
         CustomInputTableStore.registerIfExists()
-        let containerURL = AppGroup.containerURL()
-        let applicationDirectoryURL = AppGroup.memoryDirectoryURL()
+        let containerURL = environment.sharedContainerURL
+        let applicationDirectoryURL = environment.memoryDirectoryURL
         let typoCorrectionDirectoryURL = DebugTypoCorrectionWeights.modelDirectoryURL(
             azooKeyApplicationSupportDirectoryURL: applicationDirectoryURL.deletingLastPathComponent()
         )
@@ -105,7 +108,10 @@ extension ConverterServer {
             kanaKanjiConverter: kanaKanjiConverter,
             applicationDirectoryURL: applicationDirectoryURL,
             containerURL: containerURL,
-            context: .init(useZenzai: true, resourcesDirectoryURL: appResourcesDirectoryURL())
+            context: .init(
+                useZenzai: true,
+                resourcesDirectoryURL: environment.resourcesDirectoryURL ?? appResourcesDirectoryURL()
+            )
         )
     }
 
