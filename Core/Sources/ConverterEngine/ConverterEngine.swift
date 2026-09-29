@@ -279,7 +279,7 @@ public final class ConverterEngine: @unchecked Sendable {
     @MainActor
     func getSession(_ sessionID: String) throws -> ConverterSession {
         guard let session = sessions[sessionID] else {
-            throw ConverterServerError.unknownSession(sessionID)
+            throw ConverterEngineError.unknownSession(sessionID)
         }
         return session
     }
