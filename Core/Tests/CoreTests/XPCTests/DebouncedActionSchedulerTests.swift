@@ -1,9 +1,9 @@
 import Core
 import Testing
 
-@MainActor
+@ConverterEngineActor
 @Test func debouncedActionRunsOnlyAfterLatestSchedule() {
-    var scheduledActions: [@MainActor @Sendable () -> Void] = []
+    var scheduledActions: [@ConverterEngineActor @Sendable () -> Void] = []
     let scheduler = DebouncedActionScheduler { _, action in
         scheduledActions.append(action)
     }
@@ -24,9 +24,9 @@ import Testing
     #expect(!scheduler.isPending)
 }
 
-@MainActor
+@ConverterEngineActor
 @Test func cancelledDebouncedActionDoesNotRun() {
-    var scheduledAction: (@MainActor @Sendable () -> Void)?
+    var scheduledAction: (@ConverterEngineActor @Sendable () -> Void)?
     let scheduler = DebouncedActionScheduler { _, action in
         scheduledAction = action
     }
