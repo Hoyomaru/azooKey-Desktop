@@ -19,7 +19,7 @@ public final class ConverterEngine: @unchecked Sendable {
         self.shutdownHandler = shutdownHandler
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func execute(_ command: ConverterServerCommand) async throws -> ConverterServerResponse {
         defer { learningDataCommitScheduler.postponeIfScheduled(after: Self.learningDataCommitDelay) }
         switch command {
@@ -36,7 +36,7 @@ public final class ConverterEngine: @unchecked Sendable {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func createSessionIfNeeded(_ sessionID: String) {
         guard sessions[sessionID] == nil else {
             return
@@ -51,7 +51,7 @@ public final class ConverterEngine: @unchecked Sendable {
         )
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func handle(_ command: ConverterMaintenanceCommand) throws -> ConverterServerResponse {
         switch command {
         case .synchronizeUserDictionary(let forceExport):
@@ -69,7 +69,7 @@ public final class ConverterEngine: @unchecked Sendable {
         return ConverterServerResponse(snapshot: .empty)
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func handle(_ command: ConverterSessionCommand, sessionID: String) async throws -> ConverterServerResponse {
         let session = try getSession(sessionID)
         switch command {
@@ -103,7 +103,7 @@ public final class ConverterEngine: @unchecked Sendable {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func withConverterSession<Result>(
         _ session: ConverterSession,
         operation: () throws -> Result
@@ -111,7 +111,7 @@ public final class ConverterEngine: @unchecked Sendable {
         try kanaKanjiConverter.withSession(session.conversionSessionID, operation: operation)
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func handle(
         _ command: ConverterSessionLifecycleCommand,
         session: ConverterSession
@@ -140,7 +140,7 @@ public final class ConverterEngine: @unchecked Sendable {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func handle(
         _ command: ConverterSettingsCommand,
         session: ConverterSession
@@ -158,7 +158,7 @@ public final class ConverterEngine: @unchecked Sendable {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func handle(
         _ command: ConverterCompositionCommand,
         session: ConverterSession
@@ -186,7 +186,7 @@ public final class ConverterEngine: @unchecked Sendable {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func handle(
         _ command: ConverterCandidateCommand,
         session: ConverterSession
@@ -215,7 +215,7 @@ public final class ConverterEngine: @unchecked Sendable {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func handle(
         _ command: ConverterReplaceSuggestionCommand,
         session: ConverterSession
@@ -258,14 +258,14 @@ public final class ConverterEngine: @unchecked Sendable {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func scheduleLearningDataCommit() {
         learningDataCommitScheduler.schedule(after: Self.learningDataCommitDelay) { [weak self] in
             self?.kanaKanjiConverter.commitUpdateLearningData()
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     @discardableResult
     public func removeSession(_ sessionID: String) -> Bool {
         guard let session = sessions.removeValue(forKey: sessionID) else {
@@ -276,7 +276,7 @@ public final class ConverterEngine: @unchecked Sendable {
         return true
     }
 
-    @MainActor
+    @ConverterEngineActor
     func getSession(_ sessionID: String) throws -> ConverterSession {
         guard let session = sessions[sessionID] else {
             throw ConverterEngineError.unknownSession(sessionID)
