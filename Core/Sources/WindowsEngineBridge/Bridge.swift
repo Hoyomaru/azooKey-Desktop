@@ -4,7 +4,7 @@ import Foundation
 
 private let bridgeABIVersion: UInt32 = 2
 
-private typealias EngineResponseCallback = @convention(c) (
+public typealias EngineResponseCallback = @convention(c) (
     UnsafeMutableRawPointer?,
     Int32,
     UnsafePointer<UInt8>?,
