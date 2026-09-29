@@ -3,7 +3,9 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+#if canImport(ZIPFoundation)
 import ZIPFoundation
+#endif
 
 public enum DebugTypoCorrectionState: Sendable, Equatable {
     case downloaded
@@ -15,6 +17,7 @@ public enum DebugTypoCorrectionWeightsError: LocalizedError, Sendable {
     case invalidHTTPStatus(url: URL, statusCode: Int)
     case hashMismatch(fileName: String, expected: String, actual: String)
     case extractedFolderNotFound(path: String)
+    case archiveExtractionUnavailable
 
     public var errorDescription: String? {
         switch self {
@@ -24,6 +27,8 @@ public enum DebugTypoCorrectionWeightsError: LocalizedError, Sendable {
             return "Hash mismatch for \(fileName). expected=\(expected), actual=\(actual)"
         case .extractedFolderNotFound(let path):
             return "Extracted folder not found at \(path)"
+        case .archiveExtractionUnavailable:
+            return "Archive extraction is not available on this platform"
         }
     }
 }
@@ -104,7 +109,11 @@ public enum DebugTypoCorrectionWeights {
         try fileManager.moveItem(at: temporaryFileURL, to: downloadedZipTemporaryURL)
 
         let extractionRootURL = temporaryRootURL.appendingPathComponent("extracted", isDirectory: true)
+#if canImport(ZIPFoundation)
         try fileManager.unzipItem(at: downloadedZipTemporaryURL, to: extractionRootURL)
+#else
+        throw DebugTypoCorrectionWeightsError.archiveExtractionUnavailable
+#endif
 
         let stagingDirectoryURL = extractionRootURL.appendingPathComponent(Self.bundleDirectoryName, isDirectory: true)
         guard fileManager.fileExists(atPath: stagingDirectoryURL.path) else {
