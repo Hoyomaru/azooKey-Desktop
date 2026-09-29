@@ -45,7 +45,7 @@ private func makePredictionSegmentsManager() -> SegmentsManager {
     #expect(candidate?.deleteCount == 0)
 }
 
-@MainActor
+@ConverterEngineActor
 @Test func testAcceptPredictionCandidateCompletesReadingAndContinuesRomanInput() throws {
     let manager = makePredictionSegmentsManager()
     manager.insertAtCursorPosition("hida", inputStyle: .roman2kana)
@@ -56,7 +56,7 @@ private func makePredictionSegmentsManager() -> SegmentsManager {
     #expect(manager.convertTarget == "ひだりにまがる")
 }
 
-@MainActor
+@ConverterEngineActor
 @Test func testAcceptPredictionCandidateReplacesPendingRomanSuffix() throws {
     let manager = makePredictionSegmentsManager()
     manager.insertAtCursorPosition("arigat", inputStyle: .roman2kana)
@@ -65,7 +65,7 @@ private func makePredictionSegmentsManager() -> SegmentsManager {
     #expect(manager.convertTarget == "ありがとう")
 }
 
-@MainActor
+@ConverterEngineActor
 @Test func testAcceptPredictionCandidateRejectsStaleCandidateWithoutEditingInput() throws {
     let manager = makePredictionSegmentsManager()
     manager.insertAtCursorPosition("こんにちは", inputStyle: .direct)
@@ -74,7 +74,7 @@ private func makePredictionSegmentsManager() -> SegmentsManager {
     #expect(manager.convertTarget == "こんにちは")
 }
 
-@MainActor
+@ConverterEngineActor
 @Test func testAcceptTypoCorrectionPredictionCandidateReplacesReading() throws {
     let manager = makePredictionSegmentsManager()
     manager.insertAtCursorPosition("こんびんは", inputStyle: .direct)
