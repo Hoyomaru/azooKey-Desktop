@@ -1,10 +1,25 @@
+import ConverterEngine
 import Core
 import Foundation
-import KanaKanjiConverterModuleWithDefaultDictionary
 
-private let bridgeABIVersion: UInt32 = 1
+private let bridgeABIVersion: UInt32 = 2
 
-private struct BridgeRequest: Decodable {
+private typealias EngineResponseCallback = @convention(c) (
+    UnsafeMutableRawPointer?,
+    Int32,
+    UnsafePointer<UInt8>?,
+    UInt32
+) -> Void
+
+private struct BridgeConfiguration: Decodable {
+    var protocolVersion: UInt32
+    var applicationSupportDirectory: String?
+    var memoryDirectory: String?
+    var resourcesDirectory: String?
+    var sharedContainerDirectory: String?
+}
+
+private struct BridgeDiagnosticRequest: Decodable {
     var type: String
     var text: String?
     var inputStyle: String?
@@ -12,74 +27,185 @@ private struct BridgeRequest: Decodable {
 
 private struct ConversionSmokeResponse: Encodable {
     var type = "conversion-smoke"
+    var convertTarget: String
     var candidates: [String]
 }
 
-private final class BridgeEngine {
-    private let configuration: Data
-    private let converter = KanaKanjiConverter.withDefaultDictionary()
-    private let memoryDirectoryURL: URL
+private struct CallbackTarget: @unchecked Sendable {
+    var callback: EngineResponseCallback
+    var userData: UnsafeMutableRawPointer?
 
-    init(configuration: Data) {
+    func respond(status: Int32, data: Data = Data()) {
+        data.withUnsafeBytes { rawBuffer in
+            callback(
+                userData,
+                status,
+                rawBuffer.bindMemory(to: UInt8.self).baseAddress,
+                UInt32(data.count)
+            )
+        }
+    }
+}
+
+private final class BridgeEngine: @unchecked Sendable {
+    private let configuration: BridgeConfiguration
+    private let engine: ConverterEngine
+
+    init(configurationData: Data) throws {
+        let configuration = try JSONDecoder().decode(
+            BridgeConfiguration.self,
+            from: configurationData
+        )
+        guard configuration.protocolVersion == bridgeABIVersion else {
+            throw BridgeError.unsupportedProtocolVersion(configuration.protocolVersion)
+        }
         self.configuration = configuration
-        self.memoryDirectoryURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("azookey-desktop-engine", isDirectory: true)
-        try? FileManager.default.createDirectory(
-            at: self.memoryDirectoryURL,
+
+        let rootDirectory = URL(
+            fileURLWithPath: configuration.applicationSupportDirectory
+                ?? FileManager.default.temporaryDirectory
+                    .appendingPathComponent("azookey-desktop-engine", isDirectory: true)
+                    .path,
+            isDirectory: true
+        )
+        let memoryDirectory = URL(
+            fileURLWithPath: configuration.memoryDirectory
+                ?? rootDirectory.appendingPathComponent("Memory", isDirectory: true).path,
+            isDirectory: true
+        )
+        let resourcesDirectory = configuration.resourcesDirectory.map {
+            URL(fileURLWithPath: $0, isDirectory: true)
+        }
+        let sharedContainerDirectory = configuration.sharedContainerDirectory.map {
+            URL(fileURLWithPath: $0, isDirectory: true)
+        } ?? rootDirectory
+
+        try FileManager.default.createDirectory(
+            at: rootDirectory,
             withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: memoryDirectory,
+            withIntermediateDirectories: true
+        )
+
+        self.engine = ConverterEngine(
+            environment: .init(
+                applicationSupportDirectoryURL: rootDirectory,
+                memoryDirectoryURL: memoryDirectory,
+                resourcesDirectoryURL: resourcesDirectory,
+                sharedContainerURL: sharedContainerDirectory
+            )
         )
     }
 
-    func handle(_ request: Data) throws -> Data {
-        guard let bridgeRequest = try? JSONDecoder().decode(BridgeRequest.self, from: request),
-              bridgeRequest.type == "conversion-smoke",
-              let text = bridgeRequest.text
-        else {
-            // Keep unknown requests byte-for-byte compatible while the complete
-            // ConverterServer command host is being moved into the shared engine.
-            _ = configuration
-            return request
+    func handle(
+        _ request: Data,
+        completion: @escaping @Sendable (Result<Data, Error>) -> Void
+    ) {
+        let engine = self.engine
+        Task { @MainActor in
+            do {
+                if let diagnostic = try? JSONDecoder().decode(
+                    BridgeDiagnosticRequest.self,
+                    from: request
+                ) {
+                    switch diagnostic.type {
+                    case "bridge-smoke":
+                        completion(.success(request))
+                        return
+                    case "conversion-smoke":
+                        completion(.success(try await self.runConversionSmoke(diagnostic)))
+                        return
+                    default:
+                        break
+                    }
+                }
+
+                let command = try ConverterServerCodec.decodeCommand(from: request)
+                let response = try await engine.execute(command)
+                completion(.success(try ConverterServerCodec.encode(response)))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+
+    @MainActor
+    private func runConversionSmoke(_ request: BridgeDiagnosticRequest) async throws -> Data {
+        let text = request.text ?? "へんかん"
+        let sessionID = "windows-bridge-smoke"
+        let inputStyle: ConverterInputStyle = request.inputStyle == "roman2kana" ? .roman2kana : .direct
+        let activation = ConverterSessionActivation(
+            config: ConverterSessionConfig(
+                aiBackendPreference: .off,
+                openAIModelName: Config.OpenAiModelName.default,
+                openAIEndpoint: Config.OpenAiApiEndpoint.default,
+                openAIAPIKey: .init(""),
+                includeContextInAITransform: true
+            ),
+            inputLanguage: .japanese
+        )
+
+        var response = ConverterServerResponse(snapshot: .empty)
+        for (offset, character) in text.map(String.init).enumerated() {
+            let keyRequest = ConverterKeyEventRequest(
+                eventID: UInt64(offset + 1),
+                event: KeyEventCore(
+                    modifierFlags: [],
+                    characters: character,
+                    charactersIgnoringModifiers: character,
+                    keyCode: 0
+                ),
+                inputStyle: inputStyle,
+                liveConversionEnabled: false,
+                enableDebugWindow: false,
+                enableSuggestion: false,
+                context: .init(),
+                activation: offset == 0 ? activation : nil
+            )
+            let command: ConverterServerCommand
+            if offset == 0 {
+                command = .openSession(
+                    sessionID: sessionID,
+                    command: .handleKeyEvent(keyRequest)
+                )
+            } else {
+                command = .session(
+                    sessionID: sessionID,
+                    command: .handleKeyEvent(keyRequest)
+                )
+            }
+            response = try await engine.execute(command)
         }
 
-        var composingText = ComposingText()
-        composingText.insertAtCursorPosition(
-            text,
-            inputStyle: bridgeRequest.inputStyle == "roman2kana" ? .roman2kana : .direct
-        )
+        let candidates: [String]
+        switch response.snapshot.candidateWindow {
+        case .hidden:
+            candidates = []
+        case .composing(let presentations, _), .selecting(let presentations, _):
+            candidates = presentations.map(\.text)
+        }
 
-        let conversionStartedAt = Date()
-        print("[WindowsEngineBridge] requestCandidates begin")
-
-        let result = converter.requestCandidates(
-            composingText,
-            options: .init(
-                N_best: 5,
-                requireJapanesePrediction: .disabled,
-                requireEnglishPrediction: .disabled,
-                keyboardLanguage: .ja_JP,
-                englishCandidateInRoman2KanaInput: false,
-                fullWidthRomanCandidate: false,
-                halfWidthKanaCandidate: false,
-                learningType: .nothing,
-                maxMemoryCount: 65536,
-                shouldResetMemory: false,
-                memoryDirectoryURL: memoryDirectoryURL,
-                sharedContainerURL: memoryDirectoryURL,
-                textReplacer: .empty,
-                specialCandidateProviders: [],
-                metadata: .init(versionString: "azooKey Windows bridge")
-            )
-        )
-
-        print(
-            "[WindowsEngineBridge] requestCandidates end:",
-            Date().timeIntervalSince(conversionStartedAt),
-            "seconds"
-        )
+        _ = engine.removeSession(sessionID)
 
         return try JSONEncoder().encode(
-            ConversionSmokeResponse(candidates: result.mainResults.prefix(10).map(\.text))
+            ConversionSmokeResponse(
+                convertTarget: response.snapshot.convertTarget,
+                candidates: candidates
+            )
         )
+    }
+}
+
+private enum BridgeError: LocalizedError {
+    case unsupportedProtocolVersion(UInt32)
+
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedProtocolVersion(let version):
+            "Unsupported bridge protocol version: \(version)"
+        }
     }
 }
 
@@ -93,29 +219,33 @@ public func azookeyEngineCreate(
     _ configurationBytes: UnsafePointer<UInt8>?,
     _ configurationLength: UInt32
 ) -> UnsafeMutableRawPointer? {
-    let configuration: Data
-    if configurationLength == 0 {
-        configuration = Data()
-    } else {
-        guard let configurationBytes else {
-            return nil
-        }
-        configuration = Data(bytes: configurationBytes, count: Int(configurationLength))
+    guard let configurationBytes, configurationLength > 0 else {
+        return nil
     }
-
-    return Unmanaged.passRetained(BridgeEngine(configuration: configuration)).toOpaque()
+    let configuration = Data(
+        bytes: configurationBytes,
+        count: Int(configurationLength)
+    )
+    do {
+        return Unmanaged.passRetained(
+            try BridgeEngine(configurationData: configuration)
+        ).toOpaque()
+    } catch {
+        return nil
+    }
 }
 
-@_cdecl("azookey_engine_handle")
-public func azookeyEngineHandle(
+@_cdecl("azookey_engine_handle_async")
+public func azookeyEngineHandleAsync(
     _ context: UnsafeMutableRawPointer?,
     _ requestBytes: UnsafePointer<UInt8>?,
     _ requestLength: UInt32,
-    _ responseBytes: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
-    _ responseLength: UnsafeMutablePointer<UInt32>?
-) -> Int32 {
-    guard let context, let responseBytes, let responseLength else {
-        return -1
+    _ callback: EngineResponseCallback?,
+    _ userData: UnsafeMutableRawPointer?
+) {
+    guard let context, let callback else {
+        callback?(userData, -1, nil, 0)
+        return
     }
 
     let request: Data
@@ -123,42 +253,22 @@ public func azookeyEngineHandle(
         request = Data()
     } else {
         guard let requestBytes else {
-            return -2
+            callback(userData, -2, nil, 0)
+            return
         }
         request = Data(bytes: requestBytes, count: Int(requestLength))
     }
 
+    let target = CallbackTarget(callback: callback, userData: userData)
     let engine = Unmanaged<BridgeEngine>.fromOpaque(context).takeUnretainedValue()
-    let response: Data
-    do {
-        response = try engine.handle(request)
-    } catch {
-        return -4
+    engine.handle(request) { result in
+        switch result {
+        case .success(let data):
+            target.respond(status: 0, data: data)
+        case .failure:
+            target.respond(status: -4)
+        }
     }
-
-    guard response.count <= Int(UInt32.max) else {
-        return -3
-    }
-
-    responseLength.pointee = UInt32(response.count)
-    guard !response.isEmpty else {
-        responseBytes.pointee = nil
-        return 0
-    }
-
-    let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: response.count)
-    response.copyBytes(to: buffer, count: response.count)
-    responseBytes.pointee = buffer
-    return 0
-}
-
-@_cdecl("azookey_engine_free")
-public func azookeyEngineFree(
-    _ bytes: UnsafeMutablePointer<UInt8>?,
-    _ length: UInt32
-) {
-    _ = length
-    bytes?.deallocate()
 }
 
 @_cdecl("azookey_engine_destroy")
