@@ -63,6 +63,23 @@ targets.append(
 )
 #endif
 
+#if os(Windows)
+products.append(
+    .library(
+        name: "AzooKeyDesktopEngine",
+        type: .dynamic,
+        targets: ["WindowsEngineBridge"]
+    )
+)
+targets.append(
+    .target(
+        name: "WindowsEngineBridge",
+        dependencies: ["Core"],
+        swiftSettings: [.interoperabilityMode(.Cxx)]
+    )
+)
+#endif
+
 let package = Package(
     name: "Core",
     platforms: [.macOS(.v13)],
