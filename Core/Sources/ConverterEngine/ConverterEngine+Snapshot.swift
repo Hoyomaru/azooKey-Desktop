@@ -11,7 +11,7 @@ enum ConverterCandidateTransform {
 }
 
 extension ConverterEngine {
-    @MainActor
+    @ConverterEngineActor
     func makeResponse(
         for session: ConverterSession,
         inputState: InputState,
@@ -30,7 +30,7 @@ extension ConverterEngine {
         )
     }
 
-    @MainActor
+    @ConverterEngineActor
     func snapshot(for session: ConverterSession, inputState: InputState) -> ConverterSessionSnapshot {
         let manager = session.manager
         if manager.isEmpty, case .unicodeInput = inputState {
@@ -85,7 +85,7 @@ extension ConverterEngine {
         )
     }
 
-    @MainActor
+    @ConverterEngineActor
     static func makeSegmentsManager(
         kanaKanjiConverter: KanaKanjiConverter,
         environment: ConverterEngineEnvironment
@@ -131,7 +131,7 @@ extension ConverterEngine {
         return Bundle.main.bundleURL.appendingPathComponent("Contents/Resources", isDirectory: true)
     }
 
-    @MainActor
+    @ConverterEngineActor
     static func resolveInputStyle(_ inputStyle: ConverterInputStyle) -> InputStyle {
         if case .tableName(CustomInputTableStore.tableName) = inputStyle,
            !CustomInputTableStore.registerIfExists() {
@@ -140,7 +140,7 @@ extension ConverterEngine {
         return inputStyle.inputStyle
     }
 
-    @MainActor
+    @ConverterEngineActor
     static func transformedCandidate(
         _ transform: ConverterCandidateTransform,
         manager: SegmentsManager,
