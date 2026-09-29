@@ -122,6 +122,30 @@ private final class BridgeEngine: @unchecked Sendable {
                     }
                 }
 
+                if let transportRequest = try? JSONDecoder().decode(
+                    WindowsTransportRequest.self,
+                    from: request
+                ) {
+                    let data: Data
+                    switch try transportRequest.action() {
+                    case .command(let command):
+                        let response = try await engine.execute(command)
+                        data = try JSONEncoder().encode(WindowsTransportResponse(response))
+                    case .closeSession(let sessionID):
+                        let removed = engine.removeSession(sessionID)
+                        data = try JSONEncoder().encode(
+                            WindowsTransportResponse(
+                                ConverterServerResponse(
+                                    handled: removed,
+                                    snapshot: .empty
+                                )
+                            )
+                        )
+                    }
+                    completion(.success(data))
+                    return
+                }
+
                 let command = try ConverterServerCodec.decodeCommand(from: request)
                 let response = try await engine.execute(command)
                 completion(.success(try ConverterServerCodec.encode(response)))
