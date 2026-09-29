@@ -144,6 +144,8 @@ struct WindowsTransportRequest: Codable {
         case closeSession(String)
     }
 
+    // Exhaustive protocol dispatch is intentionally centralized here.
+    // swiftlint:disable:next cyclomatic_complexity
     func action() throws -> Action {
         guard protocolVersion == windowsTransportProtocolVersion else {
             throw WindowsTransportError.unsupportedProtocolVersion(protocolVersion)
@@ -247,6 +249,8 @@ struct WindowsTransportResponse: Codable {
         var secondaryText: String?
         var inputLanguage: WindowsTransportInputLanguage?
 
+        // Exhaustive effect serialization keeps the wire format explicit.
+        // swiftlint:disable:next cyclomatic_complexity
         init(_ effect: ConverterClientEffect) {
             switch effect {
             case .insertText(let text):
