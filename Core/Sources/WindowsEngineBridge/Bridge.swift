@@ -104,7 +104,7 @@ private final class BridgeEngine: @unchecked Sendable {
         completion: @escaping @Sendable (Result<Data, Error>) -> Void
     ) {
         let engine = self.engine
-        Task { @MainActor in
+        Task { @ConverterEngineActor in
             do {
                 if let diagnostic = try? JSONDecoder().decode(
                     BridgeDiagnosticRequest.self,
@@ -131,7 +131,7 @@ private final class BridgeEngine: @unchecked Sendable {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func runConversionSmoke(_ request: BridgeDiagnosticRequest) async throws -> Data {
         let text = request.text ?? "へんかん"
         let sessionID = "windows-bridge-smoke"
