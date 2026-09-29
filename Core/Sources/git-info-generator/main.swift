@@ -1,6 +1,11 @@
 import Foundation
 
-var tag = try? shell("git for-each-ref refs/tags --points-at HEAD --sort=-creatordate --format='%(refname:short)' | head -n 1")
+var tag = try? shell(
+    "git for-each-ref refs/tags --points-at HEAD --sort=-creatordate --format=%(refname:short)"
+)
+    .split(whereSeparator: \.isNewline)
+    .first
+    .map(String.init)
 var commit = try? shell("git rev-parse HEAD")
 if tag?.isEmpty == true {
     tag = nil
@@ -25,11 +30,28 @@ func shell(_ command: String) throws -> String {
     let pipe = Pipe()
 
     process.standardOutput = pipe
+#if os(Windows)
+    process.executableURL = URL(
+        fileURLWithPath: ProcessInfo.processInfo.environment["COMSPEC"]
+            ?? #"C:\Windows\System32\cmd.exe"#
+    )
+    process.arguments = ["/C", command]
+#else
     process.executableURL = URL(fileURLWithPath: "/bin/bash")
     process.arguments = ["-c", command]
+#endif
 
     try process.run()
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        throw NSError(
+            domain: "GitInfoGenerator",
+            code: Int(process.terminationStatus),
+            userInfo: [NSLocalizedDescriptionKey: "Command failed: \(command)"]
+        )
+    }
 
-    return String(data: data, encoding: .utf8)!.trimmingCharacters(in: .whitespacesAndNewlines)
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    return String(decoding: data, as: UTF8.self)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
 }
