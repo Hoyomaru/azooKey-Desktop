@@ -227,7 +227,7 @@ public final class SegmentsManager {
         )
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func activate() {
         self.shouldShowCandidateWindow = false
         self.backspaceAdjustedPredictionCandidate = nil
@@ -236,7 +236,7 @@ public final class SegmentsManager {
         self.zenzaiPersonalizationMode = self.getZenzaiPersonalizationMode()
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func reloadUserDictionary() {
         self.kanaKanjiConverter.updateUserDictionaryURL(
             CompiledUserDictionaryStore.directoryURL(memoryDirectoryURL: self.azooKeyMemoryDir),
@@ -244,12 +244,12 @@ public final class SegmentsManager {
         )
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func resetLearningData() {
         self.kanaKanjiConverter.resetMemory()
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func deactivate(flushLearningData: Bool = true) {
         self.kanaKanjiConverter.stopComposition()
         if flushLearningData {
@@ -267,7 +267,7 @@ public final class SegmentsManager {
         self.lastInputStyle = .direct
     }
 
-    @MainActor
+    @ConverterEngineActor
     /// この入力を打ち切る
     public func stopComposition() {
         self.composingText.stopComposition()
@@ -283,7 +283,7 @@ public final class SegmentsManager {
         self.lastInputStyle = .direct
     }
 
-    @MainActor
+    @ConverterEngineActor
     /// 日本語入力自体をやめる
     public func stopJapaneseInput() {
         self.rawCandidates = nil
@@ -299,7 +299,7 @@ public final class SegmentsManager {
     }
 
     /// 変換キーを押したタイミングで入力の区切りを示す
-    @MainActor
+    @ConverterEngineActor
     public func insertCompositionSeparator(inputStyle: InputStyle, skipUpdate: Bool = false) {
         guard self.composingText.input.last?.piece != .compositionSeparator else {
             // すでに末尾がcompositionSeparatorの場合は何もしない
@@ -313,7 +313,7 @@ public final class SegmentsManager {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func insertAtCursorPosition(_ string: String, inputStyle: InputStyle) {
         self.lastInputStyle = inputStyle
         self.composingText.insertAtCursorPosition(string, inputStyle: inputStyle)
@@ -323,7 +323,7 @@ public final class SegmentsManager {
         self.updateRawCandidate()
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func insertAtCursorPosition(pieces: [InputPiece], inputStyle: InputStyle) {
         self.lastInputStyle = inputStyle
         self.composingText.insertAtCursorPosition(pieces.map { .init(piece: $0, inputStyle: inputStyle) })
@@ -333,7 +333,7 @@ public final class SegmentsManager {
         self.updateRawCandidate()
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func editSegment(count: Int) {
         // 現在選ばれているprefix candidateが存在する場合、まずそれに合わせてカーソルを移動する
         if let selectionIndex, let candidates, candidates.indices.contains(selectionIndex) {
@@ -364,7 +364,7 @@ public final class SegmentsManager {
         self.updateRawCandidate()
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func deleteBackwardFromCursorPosition(count: Int = 1) {
         var previousComposingText = self.composingText.prefixToCursorPosition()
         if !self.composingText.isAtEndIndex {
@@ -413,7 +413,7 @@ public final class SegmentsManager {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func forgetMemory() {
         if let selectedCandidate {
             self.kanaKanjiConverter.forgetMemory(selectedCandidate)
@@ -511,8 +511,8 @@ public final class SegmentsManager {
     ///   - forcedLeftSideContext: An optional string that overrides the left-side context (default is `nil`).
     ///
     /// - Note:
-    ///   This function is executed on the `@MainActor` to ensure UI consistency.
-    @MainActor private func updateRawCandidate(
+    ///   This function is executed on the `@ConverterEngineActor` to ensure UI consistency.
+    @ConverterEngineActor private func updateRawCandidate(
         requestRichCandidates: Bool = false,
         forcedLeftSideContext: String? = nil,
         forcedRightSideContext: String? = nil
@@ -575,13 +575,13 @@ public final class SegmentsManager {
         self.rawCandidates = result
     }
 
-    @MainActor public func update(requestRichCandidates: Bool) {
+    @ConverterEngineActor public func update(requestRichCandidates: Bool) {
         self.updateRawCandidate(requestRichCandidates: requestRichCandidates)
         self.shouldShowCandidateWindow = true
     }
 
     /// - note: 画面更新との整合性を保つため、この関数の実行前に左文脈を取得し、これを引数として与える
-    @MainActor public func prefixCandidateCommited(_ candidate: Candidate, leftSideContext: String) {
+    @ConverterEngineActor public func prefixCandidateCommited(_ candidate: Candidate, leftSideContext: String) {
         self.kanaKanjiConverter.setCompletedData(candidate)
         self.kanaKanjiConverter.updateLearningData(candidate)
         self.composingText.prefixComplete(composingCount: candidate.composingCount)
@@ -610,13 +610,13 @@ public final class SegmentsManager {
         self.shouldShowDebugCandidateWindow = enabled
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func requestSelectingNextCandidate() {
         self.isFixingAdditionalCandidateTop = false
         self.selectionIndex = (self.selectionIndex ?? -1) + 1
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func requestSelectingPrevCandidate() {
         let selectionIndex = self.selectionIndex ?? 0
 
@@ -726,7 +726,7 @@ public final class SegmentsManager {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func getModifiedRubyCandidate(inputState: InputState, _ transform: (String) -> String) -> Candidate {
         let (ruby, composingCount): (String, ComposingCount) = switch inputState {
         case .selecting:
@@ -756,7 +756,7 @@ public final class SegmentsManager {
         )
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func getModifiedRomanCandidate(inputState: InputState = .composing, _ transform: (String) -> String) -> Candidate {
         let targetComposingText: ComposingText
         switch inputState {
@@ -784,7 +784,7 @@ public final class SegmentsManager {
         return candidate
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func createAdditionalCandidates() -> [CandidatePresentation] {
         let candidates: [(candidate: Candidate, annotationText: String?)] = [
             (self.getModifiedRomanCandidate(inputState: .selecting) { $0 }, "英数"),
@@ -801,7 +801,7 @@ public final class SegmentsManager {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func showAdditionalCandidatesIfNeeded() {
         if self.isShowingAdditionalCandidates {
             return
@@ -827,7 +827,7 @@ public final class SegmentsManager {
         self.isFixingAdditionalCandidateTop = false
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func commitMarkedText(inputState: InputState) -> String {
         let markedText = self.getCurrentMarkedText(inputState: inputState)
         let text = markedText.reduce(into: "") {$0.append(contentsOf: $1.content)}
@@ -936,7 +936,7 @@ public final class SegmentsManager {
         return .init(displayText: candidate.text, appendText: appendText, deleteCount: deleteCount)
     }
 
-    @MainActor
+    @ConverterEngineActor
     public func acceptPredictionCandidate() {
         if let prediction = self.requestTypoCorrectionPredictionCandidates().first {
             self.acceptTypoCorrectionPredictionCandidate(prediction)
@@ -945,7 +945,7 @@ public final class SegmentsManager {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     func acceptPredictionCandidate(_ candidate: Candidate) {
         guard self.kanaKanjiConverter.acceptPredictionCandidate(candidate, composingText: &self.composingText) else {
             return
@@ -956,7 +956,7 @@ public final class SegmentsManager {
         self.updateRawCandidate()
     }
 
-    @MainActor
+    @ConverterEngineActor
     func acceptTypoCorrectionPredictionCandidate(_ prediction: PredictionCandidate) {
         if prediction.deleteCount > 0 {
             self.deleteBackwardFromCursorPosition(count: prediction.deleteCount)
@@ -1024,7 +1024,7 @@ public final class SegmentsManager {
         return result.mainResults.first?.text
     }
 
-    @MainActor
+    @ConverterEngineActor
     private func lmBasedBackspaceTypoCorrectionLock(previousComposingText: ComposingText) -> BackspaceTypoCorrectionLock? {
         let typoCorrectionCandidates = self.requestTypoCorrectionCandidates(
             composingText: previousComposingText,
