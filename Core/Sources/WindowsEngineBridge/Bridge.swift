@@ -106,6 +106,14 @@ private final class BridgeEngine: @unchecked Sendable {
         let engine = self.engine
         Task { @MainActor in
             do {
+                if let windowsRequest = try? JSONDecoder().decode(
+                    WindowsBridgeRequest.self,
+                    from: request
+                ) {
+                    completion(.success(try await self.runWindowsBridgeRequest(windowsRequest)))
+                    return
+                }
+
                 if let diagnostic = try? JSONDecoder().decode(
                     BridgeDiagnosticRequest.self,
                     from: request
@@ -129,6 +137,107 @@ private final class BridgeEngine: @unchecked Sendable {
                 completion(.failure(error))
             }
         }
+    }
+
+    @MainActor
+    private func runWindowsBridgeRequest(_ request: WindowsBridgeRequest) async throws -> Data {
+        guard request.windowsBridgeVersion == windowsBridgeProtocolVersion else {
+            throw BridgeError.unsupportedWindowsBridgeVersion(request.windowsBridgeVersion)
+        }
+
+        let response: WindowsBridgeResponse
+        switch request.operation {
+        case .keyEvent:
+            guard let event = request.event else {
+                throw BridgeError.missingKeyEvent
+            }
+
+            let inputLanguage = request.language?.inputLanguage ?? .japanese
+            let activation: ConverterSessionActivation? = request.activate == true
+                ? ConverterSessionActivation(
+                    config: ConverterSessionConfig(
+                        aiBackendPreference: .off,
+                        openAIModelName: Config.OpenAiModelName.default,
+                        openAIEndpoint: Config.OpenAiApiEndpoint.default,
+                        openAIAPIKey: .init(""),
+                        includeContextInAITransform: true
+                    ),
+                    inputLanguage: inputLanguage
+                )
+                : nil
+
+            let keyRequest = ConverterKeyEventRequest(
+                eventID: event.eventID,
+                event: KeyEventCore(
+                    modifierFlags: .init(rawValue: event.modifierFlags),
+                    characters: event.characters,
+                    charactersIgnoringModifiers: event.charactersIgnoringModifiers,
+                    keyCode: event.keyCode
+                ),
+                inputStyle: (request.inputStyle ?? .defaultRomanToKana).converterInputStyle,
+                liveConversionEnabled: request.liveConversionEnabled ?? true,
+                enableDebugWindow: false,
+                enableSuggestion: request.enableSuggestion ?? true,
+                enablePredictiveTyping: request.enablePredictiveTyping ?? false,
+                enableTypoCorrection: request.enableTypoCorrection ?? false,
+                enableOptionDirectFullWidthInput: false,
+                typeBackSlash: request.typeBackSlash ?? false,
+                optionDirectInputText: nil,
+                context: request.context?.converterContext ?? .init(),
+                activation: activation,
+                visibleCandidateStartIndex: request.visibleCandidateStartIndex ?? 0
+            )
+
+            let command: ConverterServerCommand
+            if activation != nil {
+                command = .openSession(
+                    sessionID: request.sessionID,
+                    command: .handleKeyEvent(keyRequest)
+                )
+            } else {
+                command = .session(
+                    sessionID: request.sessionID,
+                    command: .handleKeyEvent(keyRequest)
+                )
+            }
+            response = WindowsBridgeResponse(try await engine.execute(command))
+
+        case .snapshot:
+            response = WindowsBridgeResponse(
+                try await engine.execute(
+                    .session(
+                        sessionID: request.sessionID,
+                        command: .composition(.snapshot)
+                    )
+                )
+            )
+
+        case .commit:
+            response = WindowsBridgeResponse(
+                try await engine.execute(
+                    .session(
+                        sessionID: request.sessionID,
+                        command: .composition(.commit)
+                    )
+                )
+            )
+
+        case .stopComposition:
+            response = WindowsBridgeResponse(
+                try await engine.execute(
+                    .session(
+                        sessionID: request.sessionID,
+                        command: .composition(.stopComposition)
+                    )
+                )
+            )
+
+        case .closeSession:
+            _ = engine.removeSession(request.sessionID)
+            response = .closedSession
+        }
+
+        return try JSONEncoder().encode(response)
     }
 
     @MainActor
@@ -200,11 +309,17 @@ private final class BridgeEngine: @unchecked Sendable {
 
 private enum BridgeError: LocalizedError {
     case unsupportedProtocolVersion(UInt32)
+    case unsupportedWindowsBridgeVersion(UInt32)
+    case missingKeyEvent
 
     var errorDescription: String? {
         switch self {
         case .unsupportedProtocolVersion(let version):
             "Unsupported bridge protocol version: \(version)"
+        case .unsupportedWindowsBridgeVersion(let version):
+            "Unsupported Windows bridge protocol version: \(version)"
+        case .missingKeyEvent:
+            "Windows bridge keyEvent request is missing event data"
         }
     }
 }
