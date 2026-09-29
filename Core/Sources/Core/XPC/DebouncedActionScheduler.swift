@@ -14,7 +14,9 @@ public final class DebouncedActionScheduler {
 
     public init(
         schedule: @escaping Schedule = { delay, action in
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            Task { @ConverterEngineActor in
+                let nanoseconds = UInt64(max(0, delay) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: nanoseconds)
                 action()
             }
         }
