@@ -32,7 +32,7 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: directoryURL.appendingPathComponent("fallback.json").path))
 }
 
-@MainActor
+@ConverterEngineActor
 @Test func compiledUserDictionaryCandidatesUseExportDirectory() throws {
     guard CompiledUserDictionaryStore.defaultCharIDFileURL() != nil else {
         return
