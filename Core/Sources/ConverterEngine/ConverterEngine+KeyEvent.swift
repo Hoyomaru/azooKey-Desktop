@@ -3,7 +3,7 @@ import Foundation
 import KanaKanjiConverterModuleWithDefaultDictionary
 
 extension ConverterEngine {
-    @MainActor
+    @ConverterEngineActor
     func handleKeyEvent(
         sessionID: String,
         request: ConverterKeyEventRequest
@@ -106,7 +106,7 @@ extension ConverterEngine {
         return response
     }
 
-    @MainActor
+    @ConverterEngineActor
     // swiftlint:disable:next cyclomatic_complexity function_body_length
     func perform(
         _ action: ClientAction,
@@ -240,7 +240,7 @@ extension ConverterEngine {
         return true
     }
 
-    @MainActor
+    @ConverterEngineActor
     func apply(
         _ callback: ClientActionCallback,
         currentInputState: InputState,
@@ -257,7 +257,7 @@ extension ConverterEngine {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     func commitMarkedTextAndContinue(
         manager: SegmentsManager,
         inputState: InputState,
@@ -269,7 +269,7 @@ extension ConverterEngine {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     func submitSelectedCandidate(
         manager: SegmentsManager,
         leftSideContext: String?,
@@ -282,7 +282,7 @@ extension ConverterEngine {
         effects.append(.insertText(candidate.text))
     }
 
-    @MainActor
+    @ConverterEngineActor
     func submitTransformedCandidate(
         _ transform: ConverterCandidateTransform,
         manager: SegmentsManager,
@@ -295,7 +295,7 @@ extension ConverterEngine {
         effects.append(.insertText(candidate.text))
     }
 
-    @MainActor
+    @ConverterEngineActor
     func requestReplaceSuggestion(
         session: ConverterSession
     ) async throws {
@@ -344,7 +344,7 @@ extension ConverterEngine {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     func submitSelectedReplaceSuggestion(
         session: ConverterSession,
         effects: inout [ConverterClientEffect]
