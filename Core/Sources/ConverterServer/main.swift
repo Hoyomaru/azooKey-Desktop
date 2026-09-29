@@ -20,6 +20,14 @@ final class ConverterServer: NSObject, ConverterServerXPCProtocol, @unchecked Se
     private var sessions: [String: ConverterSession] = [:]
     private let kanaKanjiConverter = KanaKanjiConverter.withDefaultDictionary()
     private let learningDataCommitScheduler = DebouncedActionScheduler()
+    private let environment: ConverterEngineEnvironment
+
+    override init() {
+        self.environment = .macOSDefault(
+            resourcesDirectoryURL: Self.appResourcesDirectoryURL()
+        )
+        super.init()
+    }
 
     func openSession(with reply: @escaping @Sendable (String) -> Void) {
         DispatchQueue.main.async {
@@ -91,7 +99,10 @@ final class ConverterServer: NSObject, ConverterServerXPCProtocol, @unchecked Se
         }
         let conversionSessionID = kanaKanjiConverter.createSession()
         sessions[sessionID] = ConverterSession(
-            manager: Self.makeSegmentsManager(kanaKanjiConverter: kanaKanjiConverter),
+            manager: Self.makeSegmentsManager(
+                kanaKanjiConverter: kanaKanjiConverter,
+                environment: environment
+            ),
             conversionSessionID: conversionSessionID
         )
     }
@@ -100,7 +111,7 @@ final class ConverterServer: NSObject, ConverterServerXPCProtocol, @unchecked Se
     private func handle(_ command: ConverterMaintenanceCommand) throws -> ConverterServerResponse {
         switch command {
         case .synchronizeUserDictionary(let forceExport):
-            let memoryDirectoryURL = AppGroup.memoryDirectoryURL()
+            let memoryDirectoryURL = environment.memoryDirectoryURL
             if forceExport || !CompiledUserDictionaryStore.hasExportedDictionary(memoryDirectoryURL: memoryDirectoryURL) {
                 try CompiledUserDictionaryStore.exportCurrentDictionaries(memoryDirectoryURL: memoryDirectoryURL)
             }
