@@ -47,14 +47,17 @@ private final class BridgeEngine {
             inputStyle: bridgeRequest.inputStyle == "roman2kana" ? .roman2kana : .direct
         )
 
+        let conversionStartedAt = Date()
+        print("[WindowsEngineBridge] requestCandidates begin")
+
         let result = converter.requestCandidates(
             composingText,
             options: .init(
-                N_best: 10,
+                N_best: 5,
                 requireJapanesePrediction: .disabled,
                 requireEnglishPrediction: .disabled,
                 keyboardLanguage: .ja_JP,
-                englishCandidateInRoman2KanaInput: true,
+                englishCandidateInRoman2KanaInput: false,
                 fullWidthRomanCandidate: false,
                 halfWidthKanaCandidate: false,
                 learningType: .nothing,
@@ -62,10 +65,16 @@ private final class BridgeEngine {
                 shouldResetMemory: false,
                 memoryDirectoryURL: memoryDirectoryURL,
                 sharedContainerURL: memoryDirectoryURL,
-                textReplacer: .withDefaultEmojiDictionary(),
-                specialCandidateProviders: KanaKanjiConverter.defaultSpecialCandidateProviders,
+                textReplacer: .empty,
+                specialCandidateProviders: [],
                 metadata: .init(versionString: "azooKey Windows bridge")
             )
+        )
+
+        print(
+            "[WindowsEngineBridge] requestCandidates end:",
+            Date().timeIntervalSince(conversionStartedAt),
+            "seconds"
         )
 
         return try JSONEncoder().encode(
