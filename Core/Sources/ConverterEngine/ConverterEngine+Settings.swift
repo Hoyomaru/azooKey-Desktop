@@ -1,7 +1,7 @@
 import Core
 
 extension ConverterEngine {
-    @MainActor
+    @ConverterEngineActor
     static func makeSettingDescriptors(
         capabilities: ConverterSettingClientCapabilities
     ) -> [ConverterSettingDescriptor] {
@@ -217,7 +217,7 @@ extension ConverterEngine {
         }
     }
 
-    @MainActor
+    @ConverterEngineActor
     // swiftlint:disable:next cyclomatic_complexity
     static func updateSetting(key: String, value: ConverterSettingValue) throws {
         switch key {
